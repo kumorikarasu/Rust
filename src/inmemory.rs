@@ -49,5 +49,3 @@ impl<T: Entity + Clone + Debug> Database<T> for InMemory<T> {
         self.entities.lock().unwrap().remove(&id)
     }
 }
-
-
