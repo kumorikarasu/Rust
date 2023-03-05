@@ -1,9 +1,10 @@
 use std::fmt::Debug;
 use std::sync::Mutex;
 use std::sync::Arc;
-use crate::database_traits::Entity;
 use std::collections::HashMap;
-use crate::database_traits::Database;
+
+use crate::traits::Database;
+use crate::traits::Entity;
 
 pub struct InMemory<T> {
     ids: Arc<Mutex<i32>>,

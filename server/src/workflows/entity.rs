@@ -2,7 +2,7 @@ use rocket::serde::{Serialize, Deserialize};
 use chrono::serde::ts_seconds;
 use chrono::Utc;
 use chrono::DateTime;
-use crate::database_traits::Entity;
+use database::traits::Entity;
 
 
 #[derive(Serialize, Deserialize, Clone, Debug)]

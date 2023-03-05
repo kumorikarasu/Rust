@@ -1,12 +1,9 @@
-[package]
-name = "ci"
-version = "0.1.0"
-edition = "2021"
+[workspace]
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+members = [
+    "lib/database",
+    "runner",
+    "server",
+]
 
-[dependencies]
-rocket = { version = "0.5.0-rc.2", features = ["tls", "json"] }
-chrono = { version = "0.4.19", features = ["serde"] }
-serde = { version = "1.0.125", features = ["derive"] }
-lazy_static = "1.4.0"
+resolver = "2"

@@ -1,4 +1,4 @@
-use crate::database_traits::Database;
+use database::traits::Database;
 use crate::workflows::entity::Workflow;
 
 pub type WorkflowServiceType = Box<dyn Database<Workflow> + Send + Sync>;

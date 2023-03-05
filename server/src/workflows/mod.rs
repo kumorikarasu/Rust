@@ -3,7 +3,7 @@ mod service;
 mod entity;
 
 use crate::workflows::entity::Workflow;
-use crate::inmemory::InMemory;
+use database::inmemory::InMemory;
 use rocket::Build;
 use rocket::Rocket;
 
