@@ -1,5 +1,5 @@
 use database::traits::Database;
-use crate::workflows::entity::Workflow;
+use super::entity::Workflow;
 
 pub type WorkflowServiceType = Box<dyn Database<Workflow> + Send + Sync>;
 
@@ -10,17 +10,38 @@ pub const fn init(service: WorkflowServiceType) -> WorkflowService {
 }
 
 impl WorkflowService {
-    pub fn get_workflow(&self , id: i32) -> Workflow {
-        match self.0.read(id) {
-            Some(workflow) => workflow,
-            None => panic!("Workflow not found")
-        }
+    pub fn get_workflow(&self, id: u64) -> Option<Workflow> {
+        self.0.read(id)
     }
 
-    pub fn create_workflow(&self ,workflow: Workflow) -> Workflow {
+    pub fn get_workflows(&self) -> Vec<Workflow> {
+        self.0.read_all()
+    }
+
+    pub fn create_workflow(&self, mut workflow: Workflow) -> Workflow {
+        workflow.created_at = chrono::offset::Utc::now();
+        workflow.updated_at = chrono::offset::Utc::now();
+
         match self.0.insert(workflow){
             Some(workflow) => workflow,
             None => panic!("Workflow insertion failed")
+        }
+    }
+
+    pub fn update_workflow(&self, id: u64, mut workflow: Workflow) -> Workflow {
+        workflow.updated_at = chrono::offset::Utc::now();
+        workflow.id = id;
+
+        match self.0.update(workflow){
+            Some(workflow) => workflow,
+            None => panic!("Workflow insertion failed")
+        }
+    }
+
+    pub fn delete_workflow(&self, id: u64) -> Workflow {
+        match self.0.delete(id) {
+            Some(workflow) => workflow,
+            None => panic!("Workflow not found")
         }
     }
 
