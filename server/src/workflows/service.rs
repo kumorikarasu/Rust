@@ -1,7 +1,7 @@
-use database::traits::Database;
+use database::traits::IndexableDatabase;
 use super::entity::Workflow;
 
-pub type WorkflowServiceType = Box<dyn Database<Workflow> + Send + Sync>;
+pub type WorkflowServiceType = Box<dyn IndexableDatabase<Workflow> + Send + Sync>;
 
 pub struct WorkflowService(WorkflowServiceType);
 
@@ -30,9 +30,8 @@ impl WorkflowService {
 
     pub fn update_workflow(&self, id: u64, mut workflow: Workflow) -> Workflow {
         workflow.updated_at = chrono::offset::Utc::now();
-        workflow.id = id;
 
-        match self.0.update(workflow){
+        match self.0.update(id, workflow){
             Some(workflow) => workflow,
             None => panic!("Workflow insertion failed")
         }

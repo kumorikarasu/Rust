@@ -1,3 +1,6 @@
+//#![feature(trace_macros)]
+//trace_macros!(true);
+
 #[allow(unused)]
 #[macro_use] extern crate rocket;
 

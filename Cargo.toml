@@ -1,6 +1,7 @@
 [workspace]
 
 members = [
+    "lib/database_derive",
     "lib/database",
     "runner",
     "server",

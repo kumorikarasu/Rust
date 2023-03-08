@@ -10,3 +10,4 @@ rocket = { version = "0.5.0-rc.2", features = ["tls", "json"] }
 chrono = { version = "0.4.19", features = ["serde"] }
 serde = { version = "1.0.125", features = ["derive"] }
 database = { path = "../lib/database" }
+database_derive = { path = "../lib/database_derive" }
