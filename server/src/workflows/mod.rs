@@ -4,8 +4,7 @@ mod entity;
 
 use std::fs::OpenOptions;
 use database::inmemory::InMemory;
-use rocket::Build;
-use rocket::Rocket;
+
 
 use self::entity::Workflow;
 
@@ -13,24 +12,23 @@ pub trait WorkflowRoutes {
     fn workflow_mount(self) -> Self;
 }
 
-impl WorkflowRoutes for Rocket<Build> {
-    fn workflow_mount(self) -> Self {
-        let file = OpenOptions::new()
-            .read(true)
-            .write(true)
-            .create(true)
-            .open("workflows.json")
-            .unwrap();
 
-        let s = service::init(InMemory::<Workflow>::new_with_file(file));
+pub fn configure(cfg: &mut actix_web::web::ServiceConfig) {
+    let file = OpenOptions::new()
+        .read(true)
+        .write(true)
+        .create(true)
+        .open("workflows.json")
+        .unwrap();
 
-        self.mount("/workflows", routes![
-            controller::get_workflow,
-            controller::get_workflows,
-            controller::post_workflow,
-            controller::update_workflow,
-            controller::delete_workflow,
-        ])
-            .manage(s)
-    }
+    let s = service::init(InMemory::<Workflow>::new_with_file(file));
+
+    cfg.app_data(actix_web::web::Data::new(s))
+       .service(controller::get_workflows)
+       .service(controller::post_workflow)
+       .service(controller::update_workflow)
+       .service(controller::delete_workflow)
+       .service(controller::get_workflow);
+
+    //cfg.service(controller::get_workflows)
 }
