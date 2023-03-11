@@ -19,9 +19,11 @@ pub struct Workflow {
     #[serde(default)]
     pub yaml: String,
 
+    #[creation_timestamp]
     #[serde(with = "ts_seconds", default)]
     pub created_at: DateTime<Utc>,
 
+    #[timestamp]
     #[serde(with = "ts_seconds", default)]
     pub updated_at: DateTime<Utc>,
 }

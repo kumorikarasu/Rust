@@ -1,42 +1,47 @@
 
 use std::collections::BTreeMap;
+use serde::{Deserialize, Serialize};
 
-pub struct DbIndex<T> {
+use super::traits::IndexType;
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct DbIndex {
     pub index: &'static str,
-    tree: BTreeMap<T, u64>
+    tree: BTreeMap<IndexType, Vec<u64>>
 }
 
-impl<T> DbIndex<T> 
-where T: Ord + Clone + std::fmt::Debug
+impl DbIndex
 {
     pub fn get_index(&self) -> &'static str {
         self.index
     }
 
-    pub fn new(index: &'static str) -> DbIndex<T> {
+    pub fn new(index: &'static str) -> DbIndex {
         DbIndex {
             index,
             tree: BTreeMap::new()
         }
     }
 
-    pub fn insert(&mut self, key: T, value: u64) {
-        self.tree.insert(key, value);
+    pub fn insert(&mut self, key: IndexType, value: u64) {
+        self.tree.insert(key, vec![value]);
     }
 
-    pub fn get(&self, key: &T) -> Option<&u64> {
-        self.tree.get(key)
+    pub fn append(&mut self, key: IndexType, value: u64) {
+        match self.tree.get_mut(&key) {
+            Some(vec) => {
+                vec.push(value);
+            },
+            None => {
+                self.tree.insert(key, vec![value]);
+            }
+        }
     }
 
-    pub fn get_mut(&mut self, key: &T) -> Option<&mut u64> {
-        self.tree.get_mut(key)
-    }
-
-    pub fn remove(&mut self, key: &T) -> Option<u64> {
-        self.tree.remove(key)
-    }
-
-    pub fn contains_key(&self, key: &T) -> bool {
-        self.tree.contains_key(key)
+    pub fn find(&self, key: &IndexType) -> Vec<u64> {
+        match self.tree.get(key).cloned() {
+            Some(vec) => vec,
+            None => Vec::new()
+        }
     }
 }

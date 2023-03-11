@@ -1,28 +1,32 @@
-use database::traits::IndexableDatabase;
+use database::{inmemory::InMemory, traits::{Indexable, IndexType, Database, IndexableDatabase}};
 use super::entity::Workflow;
 
-pub type WorkflowServiceType = Box<dyn IndexableDatabase<Workflow> + Send + Sync>;
-
-pub struct WorkflowService(WorkflowServiceType);
-
-pub const fn init(service: WorkflowServiceType) -> WorkflowService {
-    WorkflowService(service)
+#[derive(Clone)]
+pub struct WorkflowService {
+    db: Box<InMemory<Workflow>>
 }
 
 impl WorkflowService {
+    pub fn new(db: Box<InMemory<Workflow>>) -> WorkflowService {
+        WorkflowService{
+            db
+        }
+    }
+
     pub fn get_workflow(&self, id: u64) -> Option<Workflow> {
-        self.0.read(id)
+        self.db.read(id)
     }
 
     pub fn get_workflows(&self) -> Vec<Workflow> {
-        self.0.read_all()
+        self.db.read_all()
+    }
+
+    pub fn get_workflow_name(&self, name: String) -> Vec<Workflow> {
+        self.db.search("name", IndexType::String(name))
     }
 
     pub fn create_workflow(&self, mut workflow: Workflow) -> Workflow {
-        workflow.created_at = chrono::offset::Utc::now();
-        workflow.updated_at = chrono::offset::Utc::now();
-
-        match self.0.insert(workflow){
+        match self.db.insert(workflow){
             Some(workflow) => workflow,
             None => panic!("Workflow insertion failed")
         }
@@ -31,17 +35,16 @@ impl WorkflowService {
     pub fn update_workflow(&self, id: u64, mut workflow: Workflow) -> Workflow {
         workflow.updated_at = chrono::offset::Utc::now();
 
-        match self.0.update(id, workflow){
+        match self.db.update(id, workflow){
             Some(workflow) => workflow,
             None => panic!("Workflow insertion failed")
         }
     }
 
     pub fn delete_workflow(&self, id: u64) -> Workflow {
-        match self.0.delete(id) {
+        match self.db.delete(id) {
             Some(workflow) => workflow,
             None => panic!("Workflow not found")
         }
     }
-
 }

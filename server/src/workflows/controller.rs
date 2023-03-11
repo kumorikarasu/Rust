@@ -6,7 +6,6 @@ use super::entity::Workflow;
 #[get("")]
 pub async fn get_workflows(service: Data<WorkflowService>) -> Result<impl Responder> {
    let wf = service.get_workflows();
-   println!("get_workflows: {:?}", wf);
    Ok(Json(wf))
 }
 
@@ -23,6 +22,12 @@ pub async fn get_workflow(service: Data<WorkflowService>, path: Path<u64>) -> Re
    }
 }
 
+#[get("/name/{name}")]
+pub async fn get_workflow_name(service: Data<WorkflowService>, path: Path<String>) -> Result<impl Responder> {
+   let name = path.into_inner();
+   let wf = service.get_workflow_name(name);
+   Ok(HttpResponse::Ok().json(wf))
+}
 
 #[post("")]
 pub async fn post_workflow(service: Data<WorkflowService>, workflow: Json<Workflow>) -> Result<impl Responder>{

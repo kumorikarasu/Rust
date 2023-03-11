@@ -12,8 +12,8 @@ use std::sync::Arc;
 use std::thread;
 use std::collections::HashMap;
 
-use crate::traits::Index;
-
+use super::traits::Index;
+use super::traits::Timestamp;
 use super::traits::Database;
 use super::traits::Indexable;
 use super::traits::IndexableDatabase;
@@ -21,6 +21,7 @@ use super::traits::Entity;
 use super::index::DbIndex;
 use super::traits::IndexType;
 
+#[derive(Clone)]
 pub struct InMemory<T>
 where T: Entity {
     ids: Arc<Mutex<u64>>,
@@ -30,11 +31,12 @@ where T: Entity {
     // No point in using rwlock here due to reading still needs to deref
     file: Option<Arc<Mutex<File>>>,
 
-    indexes: Vec<Box<DbIndex<IndexType>>>
+    indexes: Arc<RwLock<Vec<Arc<Mutex<DbIndex>>>>>
 }
 
+
 impl<T> InMemory<T>
-where T: Serialize + DeserializeOwned + Entity + Debug + Clone + Send + Sync + 'static
+where T: Serialize + DeserializeOwned + Entity + Index + Timestamp + Debug + Clone + Send + Sync + 'static
 {
     pub fn new() -> Box<InMemory<T>> {
         Box::new(
@@ -42,7 +44,7 @@ where T: Serialize + DeserializeOwned + Entity + Debug + Clone + Send + Sync + '
                 ids: Arc::new(Mutex::new(0)),
                 entities: Arc::new(RwLock::new(HashMap::new())),
                 file: None,
-                indexes: Vec::new()
+                indexes: Arc::new(RwLock::new(Vec::new()))
             }
         )
     }
@@ -53,7 +55,7 @@ where T: Serialize + DeserializeOwned + Entity + Debug + Clone + Send + Sync + '
                 ids: Arc::new(Mutex::new(0)),
                 entities: Arc::new(RwLock::new(HashMap::new())),
                 file: Some(Arc::new(Mutex::new(file))),
-                indexes: Vec::new()
+                indexes: Arc::new(RwLock::new(Vec::new()))
             }
         );
         db.read_from_file();
@@ -75,7 +77,7 @@ where T: Serialize + DeserializeOwned + Entity + Debug + Clone + Send + Sync + '
         file.write(json.as_bytes()).unwrap();
     }
 
-    pub fn read_from_file(&mut self) {
+    pub fn read_from_file(&self) {
         match &self.file {
             Some(file) => {
                 let mut file = file.lock().unwrap();
@@ -90,60 +92,100 @@ where T: Serialize + DeserializeOwned + Entity + Debug + Clone + Send + Sync + '
                 }
 
                 let vec: Vec<T> = serde_json::from_str(&contents).unwrap();
+                println!("Vec: {:?}", vec);
                 
                 let mut entitymap = self.entities.write().unwrap();
                 let mut id: u64 = 0;
                 for entity in vec {
+                    println!("Entity: {:?}", entity);
                     id = max(id, entity.get_id());
+                    self.add_index(&entity);
                     entitymap.insert(entity.get_id(), entity);
                 }
-                self.ids = Arc::new(Mutex::new(id));
+                *(self.ids).lock().unwrap() = id;
             }
             None => panic!("No file specified")
         };
     }
-
 }
 
 impl<T> IndexableDatabase<T> for InMemory<T>
-where T: Serialize + DeserializeOwned + Entity + Index + Clone + Debug + Send + Sync + 'static
+where T: Serialize + DeserializeOwned + Entity + Timestamp + Index + Clone + Debug + Send + Sync + 'static
 {
-    fn insert(&self, mut entity: T) -> Option<T> {
-        self.add_index(&entity);
-        self.insert_one(entity)
+    fn insert (&self, entity: T) -> Option<T> {
+        let  entity = self.insert_one(entity);
+        self.add_index(entity.as_ref().unwrap());
+        entity
+    }
+
+    fn update(&self, id: u64, entity: T) -> Option<T> {
+        self.update_one(id, entity)
     }
 }
 
 impl<T> Indexable<T> for InMemory<T>
-where T: Serialize + DeserializeOwned + Entity + Index + Clone + Debug + Send + Sync + 'static
+where T: Serialize + DeserializeOwned + Entity + Index + Timestamp + Clone + Debug + Send + Sync + 'static
 {
     fn add_index(&self, entity: &T)
     {
-        for index in entity.get_indexes().iter() {
-            println!("Index: {:?}", index.0);
-            //self.indexes.find(|x| x.get_index() == index.0);
-        }
-        //self.indexes.push(index);
-    }
+        let mut new_indexes = Vec::<DbIndex>::new();
+        let id = entity.get_id();
+        for index in entity.get_indexes() {
+            let index_name = index.0.clone();
+            let dbindexread = self.indexes.read().unwrap();
 
-    fn search(&self, index: &str, value: &str) -> u64 {
-        /*
-        let mut result = Vec::new();
-        for index in self.indexes.iter() {
-            if index.get_name() == index {
-                result = index.search(value);
-                break;
+            let dbindex = dbindexread.iter().find(|x| {
+                x.lock().unwrap().index == index.0
+            });
+
+            match dbindex {
+                Some(dbindex) => {
+                    let mut dbindexvec = dbindex.lock().unwrap();
+                    dbindexvec.append(index.1, id);
+                    continue;
+                }
+                None => {
+                    // It is fine to leak the string here as it will be used for the lifetime of the program
+                    let mut newdbindex = DbIndex::new(Box::leak(index_name.to_string().into_boxed_str()));
+                    newdbindex.insert(index.1, id);
+                    new_indexes.push(newdbindex);
+                }
             }
         }
-        result
-        */
-        0
+
+        println!("Indexes: {:?}", self.indexes);
+        println!("New indexes: {:?}", new_indexes);
+
+        if new_indexes.len() == 0 {
+            return;
+        }
+
+        let mut indexes = self.indexes.write().unwrap();
+        for index in new_indexes {
+            indexes.push(Arc::new(Mutex::new(index)));
+        }
+
+    }
+
+    fn search(&self, index: &str, value: IndexType) -> Vec<T> {
+        for i in self.indexes.read().unwrap().iter() {
+            let i = i.lock().unwrap();
+            if index == i.index {
+                let id = i.find(&value);
+                let res = self.entities.read().unwrap().iter().filter(|(id2, _)| {
+                    id.contains(id2)
+                }).map(|(_, v)| v.clone()).collect::<Vec<T>>();
+                return res
+            }
+        }
+
+        Vec::new()
     }
 }
 
 
 impl<T> Database<T> for InMemory<T>
-where T: Serialize + DeserializeOwned + Entity + Clone + Debug + Send + Sync + 'static
+where T: Serialize + DeserializeOwned + Entity + Index + Timestamp + Clone + Debug + Send + Sync + 'static
 {
     fn insert_one(&self, mut entity: T) -> Option<T> {
 
@@ -151,6 +193,8 @@ where T: Serialize + DeserializeOwned + Entity + Clone + Debug + Send + Sync + '
         let id = self.ids.lock().unwrap().clone();
 
         entity.set_id(id);
+        entity.set_timestamp(chrono::offset::Utc::now());
+        entity.set_creation_timestamp(chrono::offset::Utc::now());
         let centity = entity.clone();
 
         let result = match self.entities.write().unwrap().insert(id, entity) {
@@ -176,8 +220,19 @@ where T: Serialize + DeserializeOwned + Entity + Clone + Debug + Send + Sync + '
         lock.values().cloned().collect()
     }
 
-    fn update(&self, id: u64, mut entity: T) -> Option<T> {
+    fn update_one(&self, id: u64, mut entity: T) -> Option<T> {
         entity.set_id(id);
+
+        println!("Entity: {:?}", entity);
+        let ctimestamp = match self.entities.read().unwrap().get(&id) {
+            Some(e) => e.get_creation_timestamp(),
+            None => panic!("Entity does not exist")
+        };
+        println!("TS: {:?}", ctimestamp);
+        entity.set_creation_timestamp(ctimestamp);
+        entity.set_timestamp(chrono::offset::Utc::now());
+        println!("Entity: {:?}", entity);
+        println!("Entity: {:?}", self.entities.read().unwrap());
 
         let res = match entity.get_id() {
             0 => panic!("Entity does not have an id"),
