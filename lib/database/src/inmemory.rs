@@ -62,6 +62,9 @@ where T: Serialize + DeserializeOwned + Entity + Index + Timestamp + Debug + Clo
         db
     }
 
+    // Saves the database to a file,
+    // if empty is true, the file will be truncated, this is due to the fact when data is deleted
+    // it rewrites the file otherwise the json will get mangled.
     pub fn write_to_file(file: Arc<Mutex<File>>, entities: Arc<RwLock<HashMap<u64, T>>>, empty: bool) {
         let mut file = match file.lock() {
             Ok(f) => f,
@@ -77,6 +80,8 @@ where T: Serialize + DeserializeOwned + Entity + Index + Timestamp + Debug + Clo
         file.write(json.as_bytes()).unwrap();
     }
 
+    // Reads the database from a file and regenerates indexes
+    // TODO: Move indexes to a seperate file
     pub fn read_from_file(&self) {
         match &self.file {
             Some(file) => {
@@ -126,6 +131,8 @@ where T: Serialize + DeserializeOwned + Entity + Timestamp + Index + Clone + Deb
 impl<T> Indexable<T> for InMemory<T>
 where T: Serialize + DeserializeOwned + Entity + Index + Timestamp + Clone + Debug + Send + Sync + 'static
 {
+    // We loop through the indexes on an entity, and for each one we add its value to the index on
+    // the database. If the index does not exist, we create it.
     fn add_index(&self, entity: &T)
     {
         let mut new_indexes = Vec::<DbIndex>::new();
@@ -153,9 +160,6 @@ where T: Serialize + DeserializeOwned + Entity + Index + Timestamp + Clone + Deb
             }
         }
 
-        println!("Indexes: {:?}", self.indexes);
-        println!("New indexes: {:?}", new_indexes);
-
         if new_indexes.len() == 0 {
             return;
         }
@@ -167,11 +171,14 @@ where T: Serialize + DeserializeOwned + Entity + Index + Timestamp + Clone + Deb
 
     }
 
+    // We loop through the indexes on an entity, when we find one that matches we search for the
+    // value and return all keys that match
     fn search(&self, index: &str, value: IndexType) -> Vec<T> {
         for i in self.indexes.read().unwrap().iter() {
             let i = i.lock().unwrap();
             if index == i.index {
                 let id = i.find(&value);
+                //TODO: replace filter with getting each key directly from the hashmap
                 let res = self.entities.read().unwrap().iter().filter(|(id2, _)| {
                     id.contains(id2)
                 }).map(|(_, v)| v.clone()).collect::<Vec<T>>();
@@ -202,6 +209,7 @@ where T: Serialize + DeserializeOwned + Entity + Index + Timestamp + Clone + Deb
             None => Some(centity)
         };
 
+        // If we are using a file, spawn a thread to write out the updated database to it
         if (self.file).is_some() {
             let pass = self.file.clone().unwrap().clone();
             let pass2 = self.entities.clone();
@@ -220,6 +228,7 @@ where T: Serialize + DeserializeOwned + Entity + Index + Timestamp + Clone + Deb
         lock.values().cloned().collect()
     }
 
+    // Works just like an insert
     fn update_one(&self, id: u64, mut entity: T) -> Option<T> {
         entity.set_id(id);
 
