@@ -1,0 +1,55 @@
+---
+apiVersion: build.fortisgames.com/v1
+kind: "Workflow"
+metadata:
+  name: test-metadata
+spec:
+  displayName: "Test Metadata"
+  inputs:
+    - displayName: Game Repository URL
+      displayHint: "Choose a branch that your system will build from"
+      groupName: default
+      name: repo
+      type: string
+      required: true
+      default: "."
+    - displayName: Game Branch
+      displayHint: "Please provide ssh version of the URI"
+      groupName: default
+      name: branch
+      type: string
+      required: true
+
+  orchestrator:
+  - name: Setup Cache
+    system: [ 'docker' ]
+    job:
+      steps:
+      - name: Restore Cache
+        uses: "cache-pull.v1"
+        where: 
+        - name: folder
+          value: "."
+      - name: Git Sync
+        uses: git-sync.v1
+        where:
+          - name: repo_url
+            value: "{{ .inputs.repo }}"
+          - name: branch
+            value: "{{ .inputs.branch }}"
+      - name: Upload Some Metadata
+        uses: upload-metadata.v1
+        where:
+          - name: label
+            value: "Filename.apk"
+          - name: type
+            value: "artifact"
+          - name: icon
+            value: "android"
+          - name: data
+            value: "s3://link/to/an/apk.apk"
+      - name: echo info A
+        uses: "cache-push.v1"
+        where: 
+        - name: folder
+          value: "."
