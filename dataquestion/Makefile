@@ -1,0 +1,2 @@
+run:
+	 cargo test -- --nocapture
