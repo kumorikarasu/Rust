@@ -97,8 +97,8 @@ mod tests {
         // Act
         // Generate 10 million events
         // Create a random timestamp between 500 and 3000
-        for i in 0..1000 {
-            let random_timestamp = rand::random::<u64>() % 2500 + 500;
+        for i in 0..100 {
+            let random_timestamp = rand::random::<u64>() % 5000;
             event_aggregator.collect_event(Event { name: "game1".to_string(), event_name: "event1".to_string(), timestamp_millis: random_timestamp, });
         }
 
@@ -117,8 +117,8 @@ mod tests {
         // Act
         // Generate 10 million events
         // Create a random timestamp between 500 and 3000
-        for i in 0..1_000_000 {
-            let random_timestamp = rand::random::<u64>() % 2500 + 500;
+        for i in 0..10_000_000 {
+            let random_timestamp = rand::random::<u64>() % 5000;
             event_aggregator.collect_event(Event { name: "game1".to_string(), event_name: "event1".to_string(), timestamp_millis: random_timestamp, });
         }
 

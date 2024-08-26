@@ -60,7 +60,8 @@ impl HyperLogLog {
     }
 
     pub fn len(&self) -> f64{
-        self.harmonic_mean_with_corrections()
+        let hm = self.harmonic_mean();
+        self.correction(hm)
     }
 
     fn alpha(length: usize) -> f64{
@@ -74,20 +75,29 @@ impl HyperLogLog {
     }
 
 
-    fn harmonic_mean_with_corrections(&self) -> f64 {
+    fn harmonic_mean(&self) -> f64 {
         let mut sum = 0.0;
         let m = self.registers.len() as f64;
 
         for register in self.registers.iter(){
-            sum += 2.0_f64.powf(-(*register as f64));
+            sum += Self::hm_sum(&register);
         }
 
-        let raw = self.alpha * m.powi(2) / sum;
+        self.alpha * m.powi(2) / sum
+    }
+
+    #[inline]
+    fn hm_sum(val: &u8) -> f64 {
+        1.0 / ((1 << *val) as f64)
+    }
+
+    fn correction(&self, mean: f64) -> f64 {
+        let m = self.registers.len() as f64;
 
         //apply correction
         //Also magic
-        match raw {
-            sr if raw <= 2.5_f64 * m => {
+        match mean{
+            sr if mean <= 2.5_f64 * m => {
                 // get how many empty registers we have
                 let empty_registers = self.registers.iter().filter(|&x| *x == 0).count();
                 if empty_registers != 0 {
@@ -96,8 +106,8 @@ impl HyperLogLog {
                     sr
                 }
             }
-            mr if raw <= TWO_32 / 30.0 => mr,
-            _ => -TWO_32 * (1.0 - raw / TWO_32).ln()
+            mr if mean <= TWO_32 / 30.0 => mr,
+            _ => -TWO_32 * (1.0 - mean / TWO_32).ln()
         }
     }
 }

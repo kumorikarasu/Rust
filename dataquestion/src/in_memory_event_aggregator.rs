@@ -46,13 +46,13 @@ impl EventAggregator for InMemoryEventAggregator {
         });
 
         if self.use_hll {
-            let hll = self.tshll.entry(key.clone()).or_insert_with(|| HyperLogLog::new(0.023));
-            hll.insert(&event.timestamp_millis);
-            aggregation.unique_timestamps_hll = hll.len() as u64;
+            //let hll = self.tshll.entry(key.clone()).or_insert_with(|| HyperLogLog::new(0.023));
+            //hll.insert(&event.timestamp_millis);
+            //aggregation.unique_timestamps_hll = hll.len() as u64;
 
-            let my_hll = self.my_hll.entry(key.clone()).or_insert_with(|| myHll::new(1024));
+            let my_hll = self.my_hll.entry(key.clone()).or_insert_with(|| myHll::new(2048));
             my_hll.insert(&event.timestamp_millis);
-            aggregation.unique_timestamps_my_hll = my_hll.len() as u64;
+            //aggregation.unique_timestamps_my_hll = my_hll.len() as u64;
         } 
         if self.hard_timestamp {
             let timestamp = self.timestamps.entry(key.clone()).or_insert(Vec::new());
@@ -69,6 +69,19 @@ impl EventAggregator for InMemoryEventAggregator {
 
     fn get_aggregation_result(&self, name: &str, event_name: &str) -> Option<crate::aggregation_result::AggregationResult> {
         let key = name.to_string() + event_name + event_name + name;
-        self.result.get(&key).map(|x| x.clone())
+        self.result.get(&key).map(|x| {
+            let mut res = x.clone();
+            let my_hll = self.my_hll.get(&key);
+            if my_hll.is_some() {
+                res.unique_timestamps_my_hll = my_hll.unwrap().len() as u64;
+            }
+
+            let thll = self.tshll.get(&key);
+            if thll.is_some() {
+                res.unique_timestamps_hll = thll.unwrap().len() as u64;
+            }
+
+            res
+        })
     }
 }
